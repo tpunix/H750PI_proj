@@ -48,6 +48,20 @@ int unicode_to_utf8(u16 *u, int ulen, u8 *utf8)
 }
 
 
+u16 le16(void *p)
+{
+	u8 *q = (u8*)p;
+	return (q[1]<<8) | q[0];
+}
+
+
+u32 le32(void *p)
+{
+	u8 *q = (u8*)p;
+	return (q[3]<<24) | (q[2]<<16) | (q[1]<<8) | q[0];
+}
+
+
 /******************************************************************************/
 
 static BLKDEV *devlist[8];
@@ -72,6 +86,7 @@ int f_initdev(BLKDEV *bdev, char *devname, int index)
 		return -1;
 	}
 
+	current_dev = bdev;
 	sprintk(bdev->name, "%s%d", devname, index);
 	logmsg("\nBlock device %s: %d sectors.\n", bdev->name, bdev->sectors);
 
@@ -89,18 +104,18 @@ int f_initdev(BLKDEV *bdev, char *devname, int index)
 		return 0;
 	}
 
+
 	// 扫描4个主分区表项. 当前不支持扩展分区.
 	p = 0;
 	for(i=0; i<4; i++){
 		u8 *pt = sector_buf+446+i*16;
-		u32 *pt32 = (u32*)pt;
 
 		// 分区表项可以是全0
-		if(pt32[0]==0 && pt32[1]==0 && pt32[2]==0 && pt32[3]==0)
+		if(le32(pt+0)==0 && le32(pt+4)==0 && le32(pt+8)==0 && le32(pt+12)==0)
 			continue;
 
-		start = pt32[2];
-		size  = pt32[3];
+		start = le32(pt+8);
+		size  = le32(pt+12);
 		if((pt[0]&0x7f) || (size==0) || (start > bdev->sectors) || (start+size) > bdev->sectors){
 			// 非法的分区表项. 可以认为没有分区表.
 			return 0;
@@ -143,28 +158,24 @@ BLKDEV *f_getdev(char *path, int *part, char **rest_path)
 	BLKDEV *bdev;
 	int i;
 
+	*part = 0;
+
 	memcpy(devname, path, 8);
 	p = strchr(devname, ':');
-	if(p==NULL)
+	if(p==NULL){
 		return current_dev;
+	}
 
 	*p = 0;
 	p += 1;
 
 	if(*p>='0' && *p<='9'){
-		if(part){
-			*part = *p - '0';
-		}
+		*part = *p - '0';
 		p += 1;
-	}else{
-		if(part){
-			*part = 0;
-		}
 	}
 
-
 	if(rest_path){
-		*rest_path = p;
+		*rest_path = path+(p-devname);
 	}
 
 	for(i=0; i<8; i++){
@@ -367,7 +378,7 @@ int f_mount(BLKDEV *bdev, int part)
 	if(fs_super==NULL)
 		return -ENOSYS;
 
-	newfs = (FSDESC*)malloc(sizeof(FSDESC));
+	newfs = (FSDESC*)FS_MALLOC(sizeof(FSDESC));
 	memcpy(newfs, cfs, sizeof(FSDESC));
 	newfs->super = fs_super;
 	bdev->parts[part].fs = newfs;
@@ -385,7 +396,7 @@ int f_umount(BLKDEV *bdev, int part)
 
 	cfs = bdev->parts[part].fs;
 	cfs->umount(cfs->super);
-	free(cfs);
+	FS_FREE(cfs);
 
 	bdev->parts[part].fs = NULL;
 

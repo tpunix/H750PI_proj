@@ -103,10 +103,10 @@ void flush_tx(USB_OTG_GlobalTypeDef *USBx, uint32_t num)
 static void Wait_CoreReset(USB_OTG_GlobalTypeDef *USBx)
 {
   /* Wait for AHB master IDLE state. */
-  while ((USBx->GRSTCTL & USB_OTG_GRSTCTL_AHBIDL) == 0);
+  while ((USBx->GRSTCTL & USB_OTG_GRSTCTL_AHBIDL) == 0){};
   /* Core Soft Reset */
   USBx->GRSTCTL |= USB_OTG_GRSTCTL_CSRST;
-  while ((USBx->GRSTCTL & USB_OTG_GRSTCTL_CSRST) == USB_OTG_GRSTCTL_CSRST);
+  while ((USBx->GRSTCTL & USB_OTG_GRSTCTL_CSRST) == USB_OTG_GRSTCTL_CSRST){};
 }
 
 #if defined(USB_HS_PHYC)

@@ -121,7 +121,19 @@ static char mdays[12] = {31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31};
 
 static u32 div64(u64 a, u32 b)
 {
-	return a/b;
+	u64 t = (u64)b<<32;
+	u32 r = 0;
+
+	for(int i=0; i<32; i++){
+		if(a>=t){
+			a -= t;
+			r |= 1;
+		}
+		t >>= 1;
+		r <<= 1;
+	}
+
+	return r;
 }
 
 static void parse_ftime(u64 ftime, TIME *t)
@@ -605,7 +617,7 @@ static int ntfs_read(void *fs_super, void *fd, void *in_buf, int size)
 		int remain = size;
 		while(remain){
 			int read_size = vcn_size - vcn_offset;
-			if(read_size<remain)
+			if(read_size>remain)
 				read_size = remain;
 
 			if(ntfs->f_offset >= ntfs->f_valid){
@@ -664,7 +676,7 @@ static void dump_bpb(u8 *buf)
 	logmsg("\nBPB info:\n");
 	buf[11] = 0;
 	logmsg("  OEM name: %s\n", buf+3);
-	logmsg("  sector size: %d\n", *(u16*)(buf+0x0b));
+	logmsg("  sector size: %d\n", le16(buf+0x0b));
 	logmsg("  cluster size: %d\n", *(u8*)(buf+0x0d));
 	logmsg("  Media: %02x\n", *(u8*)(buf+0x15));
 	logmsg("  sectors per Track: %d\n", *(u16*)(buf+0x18));

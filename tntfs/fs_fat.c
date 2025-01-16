@@ -317,7 +317,8 @@ static void *fat_find(void *fs_super, void *in_dir, char *name, char *next, int 
 			dir_cluster |= (dir->cluster_high<<16);
 	}
 
-	make_dosname(name83, name);
+	if(name)
+		make_dosname(name83, name);
 
 	i = 0;
 	have_lfn = 0;
@@ -469,7 +470,7 @@ static int fat_read(void *fs_super, void *fd, void *in_buf, int size)
 	int remain = size;
 	while(remain && fatfs->f_cluster){
 		int read_size = vcn_size - vcn_offset;
-		if(read_size<remain)
+		if(read_size>remain)
 			read_size = remain;
 
 		read_cluster(fatfs, fatfs->f_cluster);
@@ -499,9 +500,7 @@ static int fat_write(void *fs_super, void *fd, void *in_buf, int size)
 
 static int fat_stat(void *fs_super, void *fd, STAT_T *st)
 {
-	FATFS *fatfs = (FATFS*)fs_super;
 	FATDIR *dir = (FATDIR*)fd;
-	int retv;
 
 	st->size = dir->size;
 
@@ -535,12 +534,12 @@ static void dump_bpb(u8 *buf, int fat_type)
 	printk("\nBPB info:\n");
 	buf[11] = 0;
 	printk("  OEM name: %s\n", buf+3);
-	printk("  sector size: %d\n", *(u16*)(buf+0x0b));
+	printk("  sector size: %d\n", le16(buf+0x0b));
 	printk("  cluster size: %d\n", *(u8*)(buf+0x0d));
-	printk("  reserved sectors: %d\n", *(u16*)(buf+0x0e));
+	printk("  reserved sectors: %d\n", le16(buf+0x0e));
 	printk("  FAT numbers: %d\n", *(u8*)(buf+0x10));
-	printk("  root entries: %d\n", *(u16*)(buf+0x11));
-	printk("  total sectors: %d\n", *(u16*)(buf+0x13));
+	printk("  root entries: %d\n", le16(buf+0x11));
+	printk("  total sectors: %d\n", le16(buf+0x13));
 	printk("  Media: %02x\n", *(u8*)(buf+0x15));
 	printk("  sectors per FAT: %d\n", *(u16*)(buf+0x16));
 	printk("  sectors per Track: %d\n", *(u16*)(buf+0x18));
@@ -558,18 +557,18 @@ static void dump_bpb(u8 *buf, int fat_type)
 		printk("  backup boot sectors: %04x\n", *(u16*)(buf+0x32));
 		printk("  drive number: %02x\n", *(u8*)(buf+0x40));
 		printk("  extended boot sig: %02x\n", *(u8*)(buf+0x42));
-		printk("  Volume serial: %08x\n", *(u32*)(buf+0x43));
+		printk("  Volume serial: %08x\n", le32(buf+0x43));
 		buf[0x52] = 0;
 		printk("  Volume label: %s\n", buf+0x47);
 	}else{
 		printk("FAT12/16 BPB2 info:\n");
 		printk("  drive number: %02x\n", *(u8*)(buf+0x24));
 		printk("  extended boot sig: %02x\n", *(u8*)(buf+0x26));
-		printk("  Volume serial: %08x\n", *(u32*)(buf+0x27));
+		printk("  Volume serial: %08x\n", le32(buf+0x27));
 		buf[0x36] = 0;
 		printk("  Volume label: %s\n", buf+0x2B);
 	}
-	logmsg("\n");
+	printk("\n");
 }
 #endif
 
@@ -613,7 +612,7 @@ static void *fat_mount(BLKDEV *bdev, int part)
 	fatfs->lba_base = 0;
 	fatfs->lba_dbr = dbr_lba;
 
-	fatfs->lba_fat1 = fatfs->lba_dbr + *(u16*)(buf+0x0e);
+	fatfs->lba_fat1 = fatfs->lba_dbr + le16(buf+0x0e);
 	if(fat_type==FS_FAT32){
 		fatfs->lba_fat2 = fatfs->lba_fat1 + *(u32*)(buf+0x24);
 		fatfs->lba_data = fatfs->lba_fat2 + *(u32*)(buf+0x24);
@@ -621,11 +620,11 @@ static void *fat_mount(BLKDEV *bdev, int part)
 	}else{
 		fatfs->lba_fat2 = fatfs->lba_fat1 + *(u16*)(buf+0x16);
 		fatfs->lba_root = fatfs->lba_fat2 + *(u16*)(buf+0x16);
-		fatfs->lba_data = fatfs->lba_root + ((*(u16*)(buf+0x11)+15)>>4);
+		fatfs->lba_data = fatfs->lba_root + ((le16(buf+0x11)+15)>>4);
 	}
 
 	fatfs->cluster_size = *(u8*)(buf+0x0d);
-	fatfs->root_size = (*(u16*)(buf+0x11)+15)>>4;
+	fatfs->root_size = (le16(buf+0x11)+15)>>4;
 
 	fatfs->fbuf = buf;
 	fatfs->dbuf = (u8*)FS_MALLOC(fatfs->cluster_size*512);

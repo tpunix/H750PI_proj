@@ -34,6 +34,8 @@ extern int lfn_utf8_len;
 
 int unicode_to_utf8(u16 *u, int ulen, u8 *utf8);
 
+u16 le16(void *p);
+u32 le32(void *p);
 
 /******************************************************************************/
 
@@ -45,7 +47,7 @@ int unicode_to_utf8(u16 *u, int ulen, u8 *utf8);
 #define EFAULT     14
 #define ENODEV     19
 #define EINVAL     22
-#define ENOSYS     40
+#define ENOSYS     88
 
 
 
