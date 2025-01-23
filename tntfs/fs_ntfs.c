@@ -61,7 +61,7 @@ typedef struct {
 
 
 typedef struct {
-	u32 fd;
+	u32 fd;       // fd是48位的。实际上只用低32位就足够了。
 	u16 fd_high;
 	u16 seq;
 	u16 len;
@@ -257,6 +257,7 @@ static u32 rl_seek_vcn(RUNLIST *rl, int vcn)
 			return 0;
 
 		if(vcn<(vcn_start+rl->LCN_size)){
+			rl->LCN = vcn - vcn_start;
 			return rl->LCN_start + ( vcn - vcn_start);
 		}
 
@@ -312,10 +313,12 @@ static void parse_record(NTFS *ntfs)
 				name = (NAME*)(buf + *(u16*)(buf+0x14));
 				ntfs->name = name;
 			}
-		}else if(id==0x80){
+		}else if(id==0x80 && ntfs->attr_80==NULL){
+			// 可能有多个数据流存在。这里只用第一个流。其他的丢弃。
 			ntfs->attr_80 = buf;
 			rl = (RUNLIST*)buf;
-			if(buf[8]){
+			buf[6] = buf[8];
+			if(buf[6]){
 				// 大文件，数据由runlist描述。
 				rl->start = *(u16*)(buf+0x20);
 				rl->next  = 0;
@@ -593,8 +596,10 @@ static int ntfs_read(void *fs_super, void *fd, void *in_buf, int size)
 	if(ntfs->f_offset+size > ntfs->name->file_size){
 		size = ntfs->name->file_size - ntfs->f_offset;
 	}
+	if(size==0)
+		return 0;
 
-	if(ntfs->attr_80[8]==0){
+	if(ntfs->attr_80[6]==0){
 		// 小文件
 		int p = *(u16*)(ntfs->attr_80+0x14);
 		p += ntfs->f_offset;
